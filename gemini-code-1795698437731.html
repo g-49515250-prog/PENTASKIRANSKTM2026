@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>Dashboard Analisis UASA & KASA 2026 - SK Taman Medan</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: auto;
+      overflow-x: hidden;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background-color: transparent;
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+    html::-webkit-scrollbar,
+    body::-webkit-scrollbar {
+      display: none;
+      width: 0;
+      height: 0;
+    }
+    .sktm-navy { background-color: #0f172a; }
+    .sktm-blue { background-color: #1e3a8a; }
+    @media print {
+      header { position: static !important; }
+      .no-print { display: none !important; }
+      .table-scroll-box { max-height: none !important; overflow: visible !important; }
+      body { background-color: #ffffff !important; }
+    }
+  </style>
+</head>
+<body class="text-slate-800">
+
+  <div class="w-full bg-[#faf8f5]">
+    <!-- HEADER MELEKAT DI ATAS (STICKY TOP-0) -->
+    <header class="sktm-navy text-white border-b-4 border-amber-200 shadow-lg sticky top-0 z-40 w-full">
+      <div class="w-full max-w-7xl mx-auto px-3 sm:px-4 py-2.5 sm:py-3.5 flex flex-col md:flex-row items-center justify-between gap-2.5">
+        
+        <!-- Logo & Tajuk Sekolah -->
+        <div class="flex items-center gap-3 w-full md:w-auto">
+          <div class="w-11 h-11 sm:w-14 sm:h-14 flex-shrink-0 bg-white rounded-xl p-1 shadow-md flex items-center justify-center overflow-hidden border border-amber-200">
+            <img 
+              src="https://drive.google.com/thumbnail?id=1UGgiexSY2c5xTA7FRSitH1l35_cefZHo&sz=w300" 
+              onerror="this.onerror=null; this.src='https://lh3.googleusercontent.com/d/1UGgiexSY2c5xTA7FRSitH1l35_cefZHo';"
+              alt="Logo SK Taman Medan" 
+              class="w-full h-full object-contain" 
+            />
+          </div>
+          <div class="min-w-0 flex-1">
+            <span class="inline-block bg-amber-100 text-slate-900 text-[10px] sm:text-xs font-bold px-2 py-0.5 rounded uppercase tracking-wider mb-0.5">
+              Unit Kurikulum & Pentaksiran
+            </span>
+            <h1 class="text-sm sm:text-xl md:text-2xl font-extrabold tracking-tight text-white leading-tight truncate">
+              DASHBOARD PENTAKSIRAN 2026
+            </h1>
+            <p class="text-amber-100/90 text-xs sm:text-sm font-medium truncate">Sekolah Kebangsaan Taman Medan</p>
+          </div>
+        </div>
+
+        <!-- Butang Intervensi & Admin -->
+        <div class="grid grid-cols-2 md:flex items-center gap-2 w-full md:w-auto no-print">
+          <button type="button" onclick="openIntervensiModal()" class="bg-amber-100 hover:bg-amber-200 text-slate-950 text-xs sm:text-sm font-bold px-3 py-2 rounded-lg shadow flex items-center justify-center gap-1.5 transition cursor-pointer border border-amber-300">
+            <span>📋</span> <span class="truncate">Senarai Intervensi</span>
+          </button>
+
+          <button type="button" id="btnAdminToggle" onclick="handleAdminAuth()" class="bg-white hover:bg-slate-100 text-slate-900 text-xs sm:text-sm font-semibold px-3 py-2 rounded-lg shadow flex items-center justify-center gap-1.5 transition border border-slate-300 cursor-pointer">
+            <span id="adminLockIcon">🔒</span> <span id="adminBtnText">Mod Admin</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- BAR PENUKAR UJIAN (UASA vs KASA) -->
+      <div class="bg-blue-950 border-t border-blue-900 w-full no-print">
+        <div class="w-full max-w-7xl mx-auto px-3 sm:px-4 flex items-center justify-between">
+          <div class="grid grid-cols-2 sm:flex gap-2 py-1.5 w-full sm:w-auto">
+            <button type="button" id="tabUASA" onclick="switchExam('UASA')" class="px-3 sm:px-5 py-1.5 rounded-md text-xs sm:text-sm font-bold bg-amber-100 text-slate-950 shadow transition cursor-pointer text-center">
+              UASA (Tahun 4 – 6)
+            </button>
+            <button type="button" id="tabKASA" onclick="switchExam('KASA')" class="px-3 sm:px-5 py-1.5 rounded-md text-xs sm:text-sm font-bold text-blue-100 hover:bg-blue-900 transition cursor-pointer text-center">
+              KASA (Tahun 1 – 3)
+            </button>
+          </div>
+          <div id="statusDataBadge" class="text-xs text-blue-200 hidden md:block">
+            Paparan Semasa: <strong class="text-amber-200" id="currentExamLabel">UASA 2026</strong>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- PANEL KHAS ADMIN -->
+    <section id="adminUploadPanel" class="hidden bg-amber-50 border-b-2 border-amber-200 w-full no-print">
+      <div class="w-full max-w-7xl mx-auto px-3 sm:px-4 py-4">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-2 mb-3">
+          <div>
+            <h2 class="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
+              🔓 Panel Muat Naik Data Pentadbir (<span id="adminPanelExamName">UASA</span>)
+            </h2>
+            <p class="text-xs text-slate-700">Muat naik fail analisis mata pelajaran (.xlsx / .csv) atau senarai murid intervensi.</p>
+          </div>
+          <button type="button" onclick="logoutAdmin()" class="text-xs bg-slate-900 text-white px-3 py-1.5 rounded hover:bg-slate-800 self-start cursor-pointer">
+            Kunci Semula Mod Admin
+          </button>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div class="bg-white p-3.5 rounded-xl border-2 border-dashed border-blue-900 flex flex-col justify-between">
+            <div>
+              <h3 class="text-xs sm:text-sm font-bold text-blue-950 mb-1">1. Fail Analisis Mata Pelajaran (<span id="uploadTargetLabel">UASA</span>)</h3>
+              <p class="text-xs text-slate-500 mb-2.5">Format fail Excel/CSV analisis penuh mengikut mata pelajaran & tahun.</p>
+            </div>
+            <label class="cursor-pointer bg-blue-950 hover:bg-blue-900 text-white text-xs font-semibold py-2 px-4 rounded-lg text-center transition">
+              Pilih Fail Analisis (.xlsx / .csv)
+              <input type="file" id="fileInputAnalisis" accept=".xlsx,.xls,.csv" class="hidden" onchange="handleAnalisisUpload(event)" />
+            </label>
+          </div>
+
+          <div class="bg-white p-3.5 rounded-xl border-2 border-dashed border-amber-400 flex flex-col justify-between">
+            <div>
+              <h3 class="text-xs sm:text-sm font-bold text-slate-900 mb-1">2. Fail Senarai Murid Intervensi (<span id="uploadIntervensiLabel">UASA</span>)</h3>
+              <p class="text-xs text-slate-500 mb-2.5">Lajur diperlukan: <strong>Nama Murid, Kelas, Subjek, Markah, Gred</strong>.</p>
+            </div>
+            <label class="cursor-pointer bg-amber-100 hover:bg-amber-200 text-slate-950 border border-amber-300 text-xs font-bold py-2 px-4 rounded-lg text-center transition">
+              Pilih Fail Senarai Intervensi (.xlsx / .csv)
+              <input type="file" id="fileInputIntervensi" accept=".xlsx,.xls,.csv" class="hidden" onchange="handleIntervensiUpload(event)" />
+            </label>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- KANDUNGAN UTAMA DASHBOARD -->
+    <main class="w-full max-w-7xl mx-auto px-2.5 sm:px-4 py-4 sm:py-6 space-y-4 sm:space-y-6">
+
+      <!-- PENAPIS MATA PELAJARAN & TAHUN + MENU CETAK/EKSPORT -->
+      <div class="bg-white p-3 sm:p-4 rounded-xl shadow-sm border border-amber-200/80 grid grid-cols-1 md:grid-cols-3 gap-3 items-end no-print">
+        <div>
+          <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Pilih Mata Pelajaran</label>
+          <select id="filterMP" onchange="renderDashboard()" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs sm:text-sm font-semibold text-slate-800 focus:ring-2 focus:ring-blue-950">
+            <option value="ALL">Semua Mata Pelajaran</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Pilih Tahun</label>
+          <select id="filterTahun" onchange="renderDashboard()" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs sm:text-sm font-semibold text-slate-800 focus:ring-2 focus:ring-blue-950">
+            <option value="ALL">Semua Tahun</option>
+          </select>
+        </div>
+        <div class="flex gap-2 relative">
+          <button type="button" onclick="resetFilters()" class="flex-1 bg-amber-50 hover:bg-amber-100 text-slate-900 text-xs sm:text-sm font-semibold py-2 px-3 rounded-lg border border-amber-200 transition cursor-pointer">
+            Set Semula
+          </button>
+
+          <!-- Butang Dropdown Cetak / Eksport PDF & Gambar -->
+          <div class="relative flex-1" id="exportDropdownWrapper">
+            <button type="button" onclick="toggleExportMenu()" class="w-full bg-blue-950 hover:bg-blue-900 text-white text-xs sm:text-sm font-semibold py-2 px-3 rounded-lg transition cursor-pointer flex items-center justify-center gap-1.5 shadow-sm">
+              <span>🖨️</span> <span>Cetak / Muat Turun</span> <span class="text-[10px]">▼</span>
+            </button>
+
+            <div id="exportMenu" class="hidden absolute right-0 mt-1.5 w-64 bg-white rounded-xl shadow-xl border border-amber-200 z-50 overflow-hidden text-left">
+              <div class="bg-amber-50 px-3 py-2 border-b border-amber-200">
+                <p class="text-[11px] font-bold text-slate-700 uppercase">Eksport Laporan & Graf</p>
+              </div>
+              <button type="button" onclick="exportDashboardPDF()" class="w-full text-left px-3.5 py-2.5 text-xs font-semibold text-slate-800 hover:bg-amber-50 flex items-center gap-2 border-b border-slate-100 cursor-pointer">
+                <span class="text-base">📄</span>
+                <div>
+                  <p class="font-bold text-blue-950">Muat Turun Laporan (PDF)</p>
+                  <p class="text-[10px] text-slate-500">Simpan kad skor, graf & jadual</p>
+                </div>
+              </button>
+              <button type="button" onclick="downloadChartImage('chartGred', 'Graf_Taburan_Gred')" class="w-full text-left px-3.5 py-2.5 text-xs font-semibold text-slate-800 hover:bg-amber-50 flex items-center gap-2 border-b border-slate-100 cursor-pointer">
+                <span class="text-base">📊</span>
+                <div>
+                  <p class="font-bold text-slate-900">Simpan Graf Gred (Gambar PNG)</p>
+                  <p class="text-[10px] text-slate-500">Graf taburan A–F & TD</p>
+                </div>
+              </button>
+              <button type="button" onclick="downloadChartImage('chartGPMP', 'Graf_Perbandingan_GPMP')" class="w-full text-left px-3.5 py-2.5 text-xs font-semibold text-slate-800 hover:bg-amber-50 flex items-center gap-2 border-b border-slate-100 cursor-pointer">
+                <span class="text-base">📈</span>
+                <div>
+                  <p class="font-bold text-slate-900">Simpan Graf GPMP (Gambar PNG)</p>
+                  <p class="text-[10px] text-slate-500">Graf perbandingan subjek</p>
+                </div>
+              </button>
+              <button type="button" onclick="triggerBrowserPrint()" class="w-full text-left px-3.5 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 flex items-center gap-2 cursor-pointer">
+                <span class="text-base">🖨️</span>
+                <div>
+                  <p class="font-bold">Cetak Terus (Pencetak)</p>
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- KAWASAN YANG DIEKSPORT KE PDF -->
+      <div id="printableReportArea" class="space-y-4 sm:space-y-6">
+
+        <!-- Tajuk Khas Paparan Semasa -->
+        <div class="bg-white px-4 py-2.5 rounded-xl border border-amber-200/80 flex flex-wrap items-center justify-between gap-2">
+          <div class="text-xs sm:text-sm font-bold text-blue-950">
+            Laporan Analisis: <span id="reportFilterTitle" class="text-slate-700 font-semibold">UASA • Semua Mata Pelajaran • Semua Tahun</span>
+          </div>
+          <div class="text-[11px] text-slate-500" id="reportTimestamp"></div>
+        </div>
+
+        <!-- KAD SKOR UTAMA (6 METRIK) -->
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 sm:gap-4">
+          <div class="bg-white p-3 sm:p-4 rounded-xl shadow-sm border-t-4 border-blue-950">
+            <p class="text-[11px] sm:text-xs font-bold text-slate-500 uppercase">Calon Daftar</p>
+            <p id="cardDaftar" class="text-xl sm:text-2xl font-extrabold text-slate-900 mt-1">0</p>
+          </div>
+          <div class="bg-white p-3 sm:p-4 rounded-xl shadow-sm border-t-4 border-blue-800">
+            <p class="text-[11px] sm:text-xs font-bold text-slate-500 uppercase">Calon Ambil</p>
+            <p id="cardAmbil" class="text-xl sm:text-2xl font-extrabold text-blue-900 mt-1">0</p>
+          </div>
+          <div class="bg-white p-3 sm:p-4 rounded-xl shadow-sm border-t-4 border-slate-400">
+            <p class="text-[11px] sm:text-xs font-bold text-slate-500 uppercase">Tidak Hadir (TD)</p>
+            <p id="cardTD" class="text-xl sm:text-2xl font-extrabold text-slate-700 mt-1">0</p>
+          </div>
+          <div class="bg-white p-3 sm:p-4 rounded-xl shadow-sm border-t-4 border-emerald-600">
+            <p class="text-[11px] sm:text-xs font-bold text-slate-500 uppercase">Menguasai (A–E)</p>
+            <p id="cardLulus" class="text-xl sm:text-2xl font-extrabold text-emerald-700 mt-1">0</p>
+          </div>
+          <div class="bg-white p-3 sm:p-4 rounded-xl shadow-sm border-t-4 border-blue-900">
+            <p class="text-[11px] sm:text-xs font-bold text-slate-500 uppercase">Peratus Lulus</p>
+            <p id="cardPeratus" class="text-xl sm:text-2xl font-extrabold text-blue-950 mt-1">0.00%</p>
+          </div>
+          <div class="bg-white p-3 sm:p-4 rounded-xl shadow-sm border-t-4 border-amber-300">
+            <p class="text-[11px] sm:text-xs font-bold text-slate-500 uppercase">GPMP</p>
+            <p id="cardGPMP" class="text-xl sm:text-2xl font-extrabold text-blue-950 mt-1">0.00</p>
+          </div>
+        </div>
+
+        <!-- BAHAGIAN GRAF -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+          <div class="bg-white p-3.5 sm:p-5 rounded-xl shadow-sm border border-amber-200/80">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+              <h3 class="text-xs sm:text-sm font-bold text-blue-950 uppercase">Taburan Gred (A – F & TD)</h3>
+              <div class="flex items-center gap-1.5">
+                <span id="chartCalonBadge" class="text-xs font-bold bg-amber-100 text-slate-900 px-2.5 py-1 rounded border border-amber-200">Jumlah Calon: 0</span>
+                <button type="button" onclick="downloadChartImage('chartGred', 'Graf_Taburan_Gred')" title="Muat Turun Gambar Graf" class="no-print bg-slate-100 hover:bg-amber-100 text-slate-800 text-xs font-bold px-2 py-1 rounded border border-slate-300 cursor-pointer">
+                  📥 PNG
+                </button>
+              </div>
+            </div>
+            <div class="h-72 sm:h-80 w-full">
+              <canvas id="chartGred"></canvas>
+            </div>
+          </div>
+
+          <div class="bg-white p-3.5 sm:p-5 rounded-xl shadow-sm border border-amber-200/80">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+              <h3 class="text-xs sm:text-sm font-bold text-blue-950 uppercase">Perbandingan GPMP Subjek</h3>
+              <div class="flex items-center gap-1.5">
+                <span class="text-xs text-slate-500 font-medium">Skala 1.00 – 6.00</span>
+                <button type="button" onclick="downloadChartImage('chartGPMP', 'Graf_Perbandingan_GPMP')" title="Muat Turun Gambar Graf" class="no-print bg-slate-100 hover:bg-amber-100 text-slate-800 text-xs font-bold px-2 py-1 rounded border border-slate-300 cursor-pointer">
+                  📥 PNG
+                </button>
+              </div>
+            </div>
+            <div class="h-72 sm:h-80 w-full">
+              <canvas id="chartGPMP"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- JADUAL ANALISIS TERPERINCI (TINGGI TERKAWAL & HEADER MELEKAT) -->
+        <div class="bg-white rounded-xl shadow-sm border border-amber-200/80 overflow-hidden">
+          <div class="bg-blue-950 text-white px-4 py-3 flex items-center justify-between border-b-2 border-amber-200">
+            <div>
+              <h3 class="text-xs sm:text-sm font-bold uppercase tracking-wide">Jadual Analisis Terperinci</h3>
+              <p class="text-[11px] text-blue-200 no-print">Skrol di dalam jadual untuk melihat semua mata pelajaran</p>
+            </div>
+            <span id="tableCountBadge" class="text-xs bg-amber-100 text-slate-950 px-2.5 py-0.5 rounded font-bold">0 Rekod</span>
+          </div>
+          <div class="table-scroll-box overflow-x-auto overflow-y-auto max-h-[460px] w-full">
+            <table class="w-full text-xs sm:text-sm text-left whitespace-nowrap">
+              <thead class="bg-amber-50 text-slate-800 text-xs uppercase border-b border-amber-200 sticky top-0 z-10 shadow-sm">
+                <tr>
+                  <th class="px-3 sm:px-4 py-3 bg-amber-50">Mata Pelajaran</th>
+                  <th class="px-3 sm:px-4 py-3 bg-amber-50">Tahun</th>
+                  <th class="px-2.5 py-3 text-center bg-amber-50">A</th>
+                  <th class="px-2.5 py-3 text-center bg-amber-50">B</th>
+                  <th class="px-2.5 py-3 text-center bg-amber-50">C</th>
+                  <th class="px-2.5 py-3 text-center bg-amber-50">D</th>
+                  <th class="px-2.5 py-3 text-center bg-amber-50">E</th>
+                  <th class="px-2.5 py-3 text-center text-red-600 bg-amber-50">F</th>
+                  <th class="px-2.5 py-3 text-center bg-amber-50">TD</th>
+                  <th class="px-2.5 py-3 text-center bg-amber-50">Ambil</th>
+                  <th class="px-2.5 py-3 text-center bg-amber-50">% Lulus</th>
+                  <th class="px-2.5 py-3 text-center bg-amber-50">GPMP</th>
+                </tr>
+              </thead>
+              <tbody id="tableBody" class="divide-y divide-slate-200"></tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </main>
+
+    <!-- FOOTER RASMI PROFESIONAL SK TAMAN MEDAN -->
+    <footer class="sktm-navy text-white border-t-4 border-amber-200 mt-4 w-full no-print">
+      <div class="w-full max-w-7xl mx-auto px-4 py-7">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 pb-6 border-b border-blue-900">
+          
+          <!-- Lajur 1: Identiti Sekolah -->
+          <div>
+            <h4 class="text-xs sm:text-sm font-extrabold text-amber-200 uppercase tracking-wider mb-2">
+              Sekolah Kebangsaan Taman Medan
+            </h4>
+            <p class="text-xs text-slate-300 leading-relaxed">
+              Unit Kurikulum & Pentaksiran<br />
+              Jalan PJS 2/1, Taman Medan, 46000 Petaling Jaya, Selangor<br />
+              PPD Petaling Utama
+            </p>
+          </div>
+
+          <!-- Lajur 2: Maklumat Pentaksiran -->
+          <div>
+            <h4 class="text-xs sm:text-sm font-extrabold text-amber-200 uppercase tracking-wider mb-2">
+              Maklumat Sistem
+            </h4>
+            <ul class="text-xs text-slate-300 space-y-1.5">
+              <li>• Analisis Ujian Akhir Sesi Akademik (UASA)</li>
+              <li>• Analisis Kemajuan Akhir Sesi Akademik (KASA)</li>
+              <li>• Rekod Intervensi & Pemulihan Murid 2026</li>
+            </ul>
+          </div>
+
+          <!-- Lajur 3: Nota Kerahsiaan & Tindakan -->
+          <div>
+            <h4 class="text-xs sm:text-sm font-extrabold text-amber-200 uppercase tracking-wider mb-2">
+              Dasar & Kegunaan
+            </h4>
+            <p class="text-xs text-slate-300 leading-relaxed mb-3">
+              Paparan analisis ini adalah untuk kegunaan rasmi pentadbiran dan warga pendidik SK Taman Medan sahaja.
+            </p>
+            <button type="button" onclick="window.scrollTo({top: 0, behavior: 'smooth'})" class="text-xs font-bold bg-amber-100 hover:bg-amber-200 text-slate-950 px-3 py-1.5 rounded transition cursor-pointer">
+              ↑ Kembali ke Atas
+            </button>
+          </div>
+
+        </div>
+
+        <!-- Bar Hak Cipta Bawah -->
+        <div class="pt-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-slate-400 text-center sm:text-left">
+          <p>© 2026 Hak Cipta Terpelihara • Unit Kurikulum SK Taman Medan</p>
+          <p>Dibangunkan untuk Pengurusan Data Pentaksiran Sekolah</p>
+        </div>
+      </div>
+    </footer>
+  </div>
+
+  <!-- MODAL KATA LALUAN ADMIN -->
+  <div id="adminLoginModal" class="fixed inset-0 bg-slate-900/75 hidden items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl max-w-sm w-full shadow-2xl border-t-4 border-amber-300 overflow-hidden">
+      <div class="bg-blue-950 text-white px-5 py-4 flex items-center justify-between">
+        <h3 class="text-base font-bold">🔒 Pengesahan Pentadbir</h3>
+        <button type="button" onclick="closeAdminModal()" class="text-white hover:text-amber-200 text-xl font-bold leading-none cursor-pointer">&times;</button>
+      </div>
+      <form onsubmit="submitAdminPassword(event)" class="p-5 space-y-4">
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1.5">Masukkan Kata Laluan Admin</label>
+          <input type="password" id="adminPasswordInput" placeholder="Kata laluan..." class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-950 focus:outline-none" required />
+          <p id="adminErrorMsg" class="text-xs text-red-600 font-semibold mt-1.5 hidden">Kata laluan tidak sah. Sila cuba lagi.</p>
+        </div>
+        <div class="flex justify-end gap-2">
+          <button type="button" onclick="closeAdminModal()" class="px-4 py-2 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg cursor-pointer">Batal</button>
+          <button type="submit" class="px-4 py-2 text-xs font-bold text-slate-950 bg-amber-200 hover:bg-amber-300 rounded-lg cursor-pointer">Log Masuk</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL SENARAI MURID INTERVENSI -->
+  <div id="intervensiModal" class="fixed inset-0 bg-slate-900/75 hidden items-center justify-center z-50 p-3">
+    <div class="bg-white rounded-2xl max-w-4xl w-full max-h-[85vh] flex flex-col shadow-2xl border-t-4 border-amber-300 overflow-hidden">
+      <div class="bg-blue-950 text-white px-5 py-3.5 flex items-center justify-between">
+        <div>
+          <h2 class="text-base sm:text-lg font-bold">Senarai Murid Intervensi (<span id="modalExamTitle">UASA</span>)</h2>
+          <p class="text-xs text-amber-100">Murid yang memerlukan program pemulihan / intervensi</p>
+        </div>
+        <button type="button" onclick="closeIntervensiModal()" class="text-white hover:text-amber-200 text-2xl font-bold leading-none cursor-pointer">&times;</button>
+      </div>
+
+      <div class="p-3 bg-amber-50/60 border-b border-amber-200 flex flex-col sm:flex-row gap-2.5">
+        <input type="text" id="searchIntervensi" onkeyup="renderIntervensiTable()" placeholder="Cari nama murid, kelas atau subjek..." class="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white" />
+        <span id="intervensiCount" class="self-start sm:self-center text-xs font-bold bg-amber-100 text-slate-900 border border-amber-300 px-3 py-2 rounded-lg">0 Murid</span>
+      </div>
+
+      <div class="overflow-auto flex-1">
+        <table class="w-full text-xs sm:text-sm text-left whitespace-nowrap">
+          <thead class="bg-slate-100 text-slate-700 text-xs uppercase sticky top-0 border-b">
+            <tr>
+              <th class="px-3 py-2.5">Bil</th>
+              <th class="px-3 py-2.5">Nama Murid</th>
+              <th class="px-3 py-2.5">Kelas</th>
+              <th class="px-3 py-2.5">Mata Pelajaran</th>
+              <th class="px-3 py-2.5 text-center">Markah</th>
+              <th class="px-3 py-2.5 text-center">Gred</th>
+            </tr>
+          </thead>
+          <tbody id="intervensiTableBody" class="divide-y divide-slate-200"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const ADMIN_PASS = "SKTM2026";
+    let isAdmin = false;
+    let currentExam = "UASA";
+
+    const examStore = {
+      UASA: {
+        analisis: [
+          { mp: "BAHASA MELAYU", tahun: "TAHUN EMPAT", a: 0, b: 0, c: 0, d: 0, e: 0, f: 0, td: 0, daftar: 302 },
+          { mp: "BAHASA MELAYU", tahun: "TAHUN LIMA", a: 88, b: 102, c: 45, d: 32, e: 20, f: 1, td: 3, daftar: 291 },
+          { mp: "BAHASA MELAYU", tahun: "TAHUN ENAM", a: 96, b: 110, c: 25, d: 20, e: 34, f: 6, td: 2, daftar: 293 },
+          { mp: "BAHASA INGGERIS", tahun: "TAHUN EMPAT", a: 0, b: 0, c: 0, d: 0, e: 0, f: 0, td: 0, daftar: 302 },
+          { mp: "BAHASA INGGERIS", tahun: "TAHUN LIMA", a: 54, b: 74, c: 68, d: 33, e: 39, f: 20, td: 3, daftar: 291 },
+          { mp: "BAHASA INGGERIS", tahun: "TAHUN ENAM", a: 57, b: 77, c: 61, d: 51, e: 36, f: 9, td: 2, daftar: 293 },
+          { mp: "MATEMATIK", tahun: "TAHUN EMPAT", a: 0, b: 0, c: 0, d: 0, e: 0, f: 0, td: 0, daftar: 302 },
+          { mp: "MATEMATIK", tahun: "TAHUN LIMA", a: 6, b: 21, c: 42, d: 72, e: 78, f: 69, td: 3, daftar: 291 },
+          { mp: "MATEMATIK", tahun: "TAHUN ENAM", a: 21, b: 29, c: 43, d: 66, e: 87, f: 45, td: 2, daftar: 293 },
+          { mp: "SAINS", tahun: "TAHUN EMPAT", a: 0, b: 0, c: 0, d: 0, e: 0, f: 0, td: 0, daftar: 302 },
+          { mp: "SAINS", tahun: "TAHUN LIMA", a: 26, b: 87, c: 78, d: 36, e: 31, f: 30, td: 3, daftar: 291 },
+          { mp: "SAINS", tahun: "TAHUN ENAM", a: 35, b: 72, c: 72, d: 72, e: 37, f: 3, td: 2, daftar: 293 },
+          { mp: "SEJARAH", tahun: "TAHUN EMPAT", a: 15, b: 69, c: 129, d: 71, e: 16, f: 1, td: 1, daftar: 302 },
+          { mp: "SEJARAH", tahun: "TAHUN LIMA", a: 24, b: 84, c: 104, d: 68, e: 8, f: 0, td: 3, daftar: 291 },
+          { mp: "SEJARAH", tahun: "TAHUN ENAM", a: 47, b: 99, c: 88, d: 47, e: 8, f: 0, td: 4, daftar: 293 },
+          { mp: "PENDIDIKAN ISLAM", tahun: "TAHUN EMPAT", a: 72, b: 77, c: 87, d: 40, e: 22, f: 2, td: 1, daftar: 301 },
+          { mp: "PENDIDIKAN ISLAM", tahun: "TAHUN LIMA", a: 119, b: 71, c: 56, d: 20, e: 20, f: 1, td: 3, daftar: 290 },
+          { mp: "PENDIDIKAN ISLAM", tahun: "TAHUN ENAM", a: 134, b: 79, c: 52, d: 13, e: 10, f: 0, td: 2, daftar: 290 },
+          { mp: "PENDIDIKAN MORAL", tahun: "TAHUN EMPAT", a: 0, b: 0, c: 1, d: 0, e: 0, f: 0, td: 0, daftar: 1 },
+          { mp: "PENDIDIKAN MORAL", tahun: "TAHUN LIMA", a: 0, b: 0, c: 1, d: 0, e: 0, f: 0, td: 0, daftar: 1 },
+          { mp: "PENDIDIKAN MORAL", tahun: "TAHUN ENAM", a: 1, b: 1, c: 0, d: 0, e: 0, f: 1, td: 0, daftar: 3 },
+          { mp: "BAHASA ARAB", tahun: "TAHUN EMPAT", a: 25, b: 59, c: 74, d: 91, e: 41, f: 11, td: 1, daftar: 302 },
+          { mp: "BAHASA ARAB", tahun: "TAHUN LIMA", a: 166, b: 64, c: 32, d: 18, e: 7, f: 0, td: 4, daftar: 291 },
+          { mp: "BAHASA ARAB", tahun: "TAHUN ENAM", a: 102, b: 57, c: 61, d: 49, e: 22, f: 0, td: 2, daftar: 293 },
+          { mp: "PENDIDIKAN SENI VISUAL", tahun: "TAHUN EMPAT", a: 52, b: 109, c: 106, d: 30, e: 4, f: 0, td: 1, daftar: 302 },
+          { mp: "PENDIDIKAN SENI VISUAL", tahun: "TAHUN LIMA", a: 97, b: 144, c: 44, d: 2, e: 1, f: 0, td: 3, daftar: 291 },
+          { mp: "PENDIDIKAN SENI VISUAL", tahun: "TAHUN ENAM", a: 95, b: 172, c: 17, d: 6, e: 1, f: 0, td: 2, daftar: 293 },
+          { mp: "PENDIDIKAN JASMANI DAN PENDIDIKAN KESIHATAN", tahun: "TAHUN EMPAT", a: 3, b: 86, c: 160, d: 48, e: 4, f: 0, td: 1, daftar: 302 },
+          { mp: "PENDIDIKAN JASMANI DAN PENDIDIKAN KESIHATAN", tahun: "TAHUN LIMA", a: 33, b: 54, c: 107, d: 65, e: 27, f: 2, td: 3, daftar: 291 },
+          { mp: "PENDIDIKAN JASMANI DAN PENDIDIKAN KESIHATAN", tahun: "TAHUN ENAM", a: 190, b: 67, c: 15, d: 5, e: 14, f: 0, td: 2, daftar: 293 },
+          { mp: "REKA BENTUK DAN TEKNOLOGI", tahun: "TAHUN EMPAT", a: 58, b: 119, c: 90, d: 29, e: 5, f: 0, td: 1, daftar: 302 },
+          { mp: "REKA BENTUK DAN TEKNOLOGI", tahun: "TAHUN LIMA", a: 14, b: 100, c: 119, d: 51, e: 4, f: 0, td: 3, daftar: 291 },
+          { mp: "REKA BENTUK DAN TEKNOLOGI", tahun: "TAHUN ENAM", a: 23, b: 109, c: 116, d: 42, e: 1, f: 0, td: 2, daftar: 293 },
+          { mp: "MUZIK", tahun: "TAHUN EMPAT", a: 88, b: 124, c: 63, d: 15, e: 8, f: 2, td: 2, daftar: 302 },
+          { mp: "MUZIK", tahun: "TAHUN LIMA", a: 68, b: 82, c: 63, d: 51, e: 23, f: 0, td: 4, daftar: 291 },
+          { mp: "MUZIK", tahun: "TAHUN ENAM", a: 128, b: 110, c: 26, d: 27, e: 0, f: 0, td: 2, daftar: 293 }
+        ],
+        intervensi: []
+      },
+      KASA: {
+        analisis: [],
+        intervensi: []
+      }
+    };
+
+    let chartGredInstance = null;
+    let chartGPMPInstance = null;
+
+    function toggleExportMenu() {
+      const menu = document.getElementById("exportMenu");
+      menu.classList.toggle("hidden");
+    }
+
+    document.addEventListener("click", function(e) {
+      const wrapper = document.getElementById("exportDropdownWrapper");
+      const menu = document.getElementById("exportMenu");
+      if (wrapper && menu && !wrapper.contains(e.target)) {
+        menu.classList.add("hidden");
+      }
+    });
+
+    function downloadChartImage(canvasId, baseFilename) {
+      document.getElementById("exportMenu").classList.add("hidden");
+      const sourceCanvas = document.getElementById(canvasId);
+      if (!sourceCanvas) return;
+
+      const selMP = document.getElementById("filterMP").value;
+      const selTahun = document.getElementById("filterTahun").value;
+      const labelMP = selMP === "ALL" ? "Semua Subjek" : selMP;
+      const labelTahun = selTahun === "ALL" ? "Semua Tahun" : selTahun;
+
+      const exportCanvas = document.createElement("canvas");
+      const paddingTop = 64;
+      const paddingSide = 24;
+      exportCanvas.width = sourceCanvas.width + (paddingSide * 2);
+      exportCanvas.height = sourceCanvas.height + paddingTop + 24;
+
+      const ctx = exportCanvas.getContext("2d");
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+
+      ctx.fillStyle = "#0f172a";
+      ctx.font = "bold 18px 'Segoe UI', sans-serif";
+      ctx.fillText(`SK TAMAN MEDAN • ${currentExam} 2026`, paddingSide, 30);
+
+      ctx.fillStyle = "#475569";
+      ctx.font = "600 14px 'Segoe UI', sans-serif";
+      ctx.fillText(`${baseFilename.replace(/_/g, " ")} (${labelMP} - ${labelTahun})`, paddingSide, 52);
+
+      ctx.drawImage(sourceCanvas, paddingSide, paddingTop);
+
+      const link = document.createElement("a");
+      const cleanName = `${baseFilename}_${currentExam}_${labelMP.replace(/\s+/g, "_")}.png`;
+      link.download = cleanName;
+      link.href = exportCanvas.toDataURL("image/png", 1.0);
+      link.click();
+    }
+
+    function exportDashboardPDF() {
+      document.getElementById("exportMenu").classList.add("hidden");
+      const element = document.getElementById("printableReportArea");
+      const selMP = document.getElementById("filterMP").value;
+      const labelMP = selMP === "ALL" ? "Semua_Subjek" : selMP.replace(/\s+/g, "_");
+
+      const opt = {
+        margin: [8, 8, 8, 8],
+        filename: `Laporan_${currentExam}_SKTM_2026_${labelMP}.pdf`,
+        image: { type: "jpeg", quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, backgroundColor: "#faf8f5" },
+        jsPDF: { unit: "mm", format: "a4", orientation: "landscape" }
+      };
+
+      if (typeof html2pdf !== "undefined") {
+        html2pdf().set(opt).from(element).save();
+      } else {
+        window.print();
+      }
+    }
+
+    function triggerBrowserPrint() {
+      document.getElementById("exportMenu").classList.add("hidden");
+      window.print();
+    }
+
+    function handleAdminAuth() {
+      if (isAdmin) {
+        document.getElementById("adminUploadPanel").classList.toggle("hidden");
+        return;
+      }
+      document.getElementById("adminErrorMsg").classList.add("hidden");
+      document.getElementById("adminPasswordInput").value = "";
+      document.getElementById("adminLoginModal").classList.remove("hidden");
+      document.getElementById("adminLoginModal").classList.add("flex");
+      setTimeout(() => document.getElementById("adminPasswordInput").focus(), 100);
+    }
+
+    function closeAdminModal() {
+      document.getElementById("adminLoginModal").classList.add("hidden");
+      document.getElementById("adminLoginModal").classList.remove("flex");
+    }
+
+    function submitAdminPassword(event) {
+      event.preventDefault();
+      const input = document.getElementById("adminPasswordInput").value;
+      if (input === ADMIN_PASS) {
+        isAdmin = true;
+        closeAdminModal();
+        document.getElementById("adminLockIcon").textContent = "🔓";
+        document.getElementById("adminBtnText").textContent = "Panel Admin";
+        document.getElementById("adminUploadPanel").classList.remove("hidden");
+      } else {
+        document.getElementById("adminErrorMsg").classList.remove("hidden");
+      }
+    }
+
+    function logoutAdmin() {
+      isAdmin = false;
+      document.getElementById("adminLockIcon").textContent = "🔒";
+      document.getElementById("adminBtnText").textContent = "Mod Admin";
+      document.getElementById("adminUploadPanel").classList.add("hidden");
+    }
+
+    function switchExam(examType) {
+      currentExam = examType;
+      document.getElementById("currentExamLabel").textContent = examType + " 2026";
+      document.getElementById("adminPanelExamName").textContent = examType;
+      document.getElementById("uploadTargetLabel").textContent = examType;
+      document.getElementById("uploadIntervensiLabel").textContent = examType;
+      document.getElementById("modalExamTitle").textContent = examType;
+
+      const tabUASA = document.getElementById("tabUASA");
+      const tabKASA = document.getElementById("tabKASA");
+      if (examType === "UASA") {
+        tabUASA.className = "px-3 sm:px-5 py-1.5 rounded-md text-xs sm:text-sm font-bold bg-amber-100 text-slate-950 shadow transition cursor-pointer text-center";
+        tabKASA.className = "px-3 sm:px-5 py-1.5 rounded-md text-xs sm:text-sm font-bold text-blue-100 hover:bg-blue-900 transition cursor-pointer text-center";
+      } else {
+        tabKASA.className = "px-3 sm:px-5 py-1.5 rounded-md text-xs sm:text-sm font-bold bg-amber-100 text-slate-950 shadow transition cursor-pointer text-center";
+        tabUASA.className = "px-3 sm:px-5 py-1.5 rounded-md text-xs sm:text-sm font-bold text-blue-100 hover:bg-blue-900 transition cursor-pointer text-center";
+      }
+
+      populateFilters();
+      renderDashboard();
+    }
+
+    function handleAnalisisUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const workbook = XLSX.read(new Uint8Array(e.target.result), { type: "array" });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+
+        const parsed = [];
+        const headerRow = rows.find(x => String(x[0]).trim().toUpperCase() === "MP");
+        const hasPctCols = headerRow ? String(headerRow[3] || "").includes("%") : false;
+
+        rows.forEach(r => {
+          const mp = String(r[0] || "").trim().toUpperCase();
+          const tahun = String(r[1] || "").trim().toUpperCase();
+          if (!mp || !tahun || mp === "MP" || tahun === "JUMLAH" || mp.includes("ANALISIS")) return;
+
+          const a = Number(r[2]) || 0;
+          const b = Number(hasPctCols ? r[4] : r[3]) || 0;
+          const c = Number(hasPctCols ? r[6] : r[4]) || 0;
+          const d = Number(hasPctCols ? r[8] : r[5]) || 0;
+          const eVal = Number(hasPctCols ? r[10] : r[6]) || 0;
+          const f = Number(hasPctCols ? r[12] : r[7]) || 0;
+          const td = Number(hasPctCols ? r[14] : r[8]) || 0;
+          const daftar = Number(hasPctCols ? r[16] : r[9]) || (a + b + c + d + eVal + f + td);
+
+          if (daftar > 0 || (a + b + c + d + eVal + f + td) > 0) {
+            parsed.push({ mp, tahun, a, b, c, d, e: eVal, f, td, daftar });
+          }
+        });
+
+        if (parsed.length > 0) {
+          examStore[currentExam].analisis = parsed;
+          populateFilters();
+          renderDashboard();
+          alert(`Berjaya memuat naik ${parsed.length} rekod analisis ${currentExam}.`);
+        } else {
+          alert("Tiada rekod sah ditemui. Pastikan struktur lajur mengikut format analisis mata pelajaran.");
+        }
+        event.target.value = "";
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    function handleIntervensiUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const workbook = XLSX.read(new Uint8Array(e.target.result), { type: "array" });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const json = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+
+        const list = json.map(row => {
+          const keys = Object.keys(row);
+          const findVal = (keywords) => {
+            const k = keys.find(key => keywords.some(kw => key.toLowerCase().includes(kw)));
+            return k ? String(row[k]).trim() : "-";
+          };
+          return {
+            nama: findVal(["nama", "murid", "calon"]),
+            kelas: findVal(["kelas", "tahun"]),
+            subjek: findVal(["subjek", "mata pelajaran", "mp"]),
+            markah: findVal(["markah", "skor"]),
+            gred: findVal(["gred", "tp", "tahap"])
+          };
+        }).filter(item => item.nama !== "-" && item.nama !== "");
+
+        examStore[currentExam].intervensi = list;
+        alert(`Berjaya memuat naik ${list.length} rekod murid intervensi bagi ${currentExam}.`);
+        event.target.value = "";
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    function populateFilters() {
+      const data = examStore[currentExam].analisis;
+      const mpSelect = document.getElementById("filterMP");
+      const tahunSelect = document.getElementById("filterTahun");
+
+      const mps = [...new Set(data.map(d => d.mp))];
+      const tahuns = [...new Set(data.map(d => d.tahun))];
+
+      mpSelect.innerHTML = `<option value="ALL">Semua Mata Pelajaran (${mps.length})</option>` +
+        mps.map(m => `<option value="${m}">${m}</option>`).join("");
+
+      tahunSelect.innerHTML = `<option value="ALL">Semua Tahun</option>` +
+        tahuns.map(t => `<option value="${t}">${t}</option>`).join("");
+    }
+
+    function resetFilters() {
+      document.getElementById("filterMP").value = "ALL";
+      document.getElementById("filterTahun").value = "ALL";
+      renderDashboard();
+    }
+
+    function renderDashboard() {
+      const data = examStore[currentExam].analisis;
+      const selMP = document.getElementById("filterMP").value;
+      const selTahun = document.getElementById("filterTahun").value;
+
+      const labelMP = selMP === "ALL" ? "Semua Mata Pelajaran" : selMP;
+      const labelTahun = selTahun === "ALL" ? "Semua Tahun" : selTahun;
+      document.getElementById("reportFilterTitle").textContent = `${currentExam} 2026 • ${labelMP} • ${labelTahun}`;
+      document.getElementById("reportTimestamp").textContent = "Dijana pada: " + new Date().toLocaleDateString("ms-MY");
+
+      const filtered = data.filter(d =>
+        (selMP === "ALL" || d.mp === selMP) &&
+        (selTahun === "ALL" || d.tahun === selTahun)
+      );
+
+      let totDaftar = 0, totA = 0, totB = 0, totC = 0, totD = 0, totE = 0, totF = 0, totTD = 0;
+      filtered.forEach(d => {
+        totDaftar += d.daftar;
+        totA += d.a; totB += d.b; totC += d.c; totD += d.d; totE += d.e; totF += d.f;
+        totTD += d.td;
+      });
+
+      const totAmbil = totA + totB + totC + totD + totE + totF;
+      const totLulus = totA + totB + totC + totD + totE;
+      const peratusLulus = totAmbil > 0 ? ((totLulus / totAmbil) * 100).toFixed(2) : "0.00";
+      const mataGred = (totA * 1) + (totB * 2) + (totC * 3) + (totD * 4) + (totE * 5) + (totF * 6);
+      const gpmp = totAmbil > 0 ? (mataGred / totAmbil).toFixed(2) : "0.00";
+
+      document.getElementById("cardDaftar").textContent = totDaftar;
+      document.getElementById("cardAmbil").textContent = totAmbil;
+      document.getElementById("cardTD").textContent = totTD;
+      document.getElementById("cardLulus").textContent = totLulus;
+      document.getElementById("cardPeratus").textContent = peratusLulus + "%";
+      document.getElementById("cardGPMP").textContent = gpmp;
+      document.getElementById("chartCalonBadge").textContent = `Jumlah Calon: ${totAmbil + totTD}`;
+
+      renderCharts(filtered, [totA, totB, totC, totD, totE, totF, totTD], totAmbil, totTD);
+      renderTable(filtered);
+    }
+
+    function renderCharts(filtered, gredTotals, totAmbil, totTD) {
+      if (chartGredInstance) chartGredInstance.destroy();
+      if (chartGPMPInstance) chartGPMPInstance.destroy();
+
+      const totalKeseluruhan = totAmbil + totTD;
+
+      const gredLabelPlugin = {
+        id: "gredLabelPlugin",
+        afterDatasetsDraw(chart) {
+          const { ctx } = chart;
+          ctx.save();
+          ctx.textAlign = "center";
+          ctx.textBaseline = "bottom";
+
+          const meta = chart.getDatasetMeta(0);
+          meta.data.forEach((bar, index) => {
+            const val = chart.data.datasets[0].data[index];
+            const isTD = index === 6;
+            const pembahagi = isTD ? totalKeseluruhan : totAmbil;
+            const pct = pembahagi > 0 ? ((val / pembahagi) * 100).toFixed(1) : "0.0";
+
+            ctx.fillStyle = "#0f172a";
+            ctx.font = "bold 10px 'Segoe UI', sans-serif";
+            ctx.fillText(val, bar.x, bar.y - 13);
+
+            ctx.fillStyle = "#475569";
+            ctx.font = "600 9px 'Segoe UI', sans-serif";
+            ctx.fillText(`(${pct}%)`, bar.x, bar.y - 2);
+          });
+          ctx.restore();
+        }
+      };
+
+      const ctxGred = document.getElementById("chartGred").getContext("2d");
+      chartGredInstance = new Chart(ctxGred, {
+        type: "bar",
+        data: {
+          labels: ["A", "B", "C", "D", "E", "F", "TD"],
+          datasets: [{
+            label: "Bilangan Murid",
+            data: gredTotals,
+            backgroundColor: ["#15803d", "#65a30d", "#eab308", "#f59e0b", "#ea580c", "#dc2626", "#64748b"],
+            borderRadius: 6
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          layout: { padding: { top: 30 } },
+          scales: {
+            y: {
+              beginAtZero: true,
+              grace: "15%",
+              title: { display: true, text: "Bilangan Murid", font: { weight: "bold", size: 11 } }
+            },
+            x: {
+              ticks: { font: { weight: "bold", size: 12 } }
+            }
+          },
+          plugins: { legend: { display: false } }
+        },
+        plugins: [gredLabelPlugin]
+      });
+
+      const mpMap = {};
+      filtered.forEach(d => {
+        if (!mpMap[d.mp]) mpMap[d.mp] = { ambil: 0, mata: 0 };
+        const ambil = d.a + d.b + d.c + d.d + d.e + d.f;
+        const mata = (d.a * 1) + (d.b * 2) + (d.c * 3) + (d.d * 4) + (d.e * 5) + (d.f * 6);
+        mpMap[d.mp].ambil += ambil;
+        mpMap[d.mp].mata += mata;
+      });
+
+      const mpLabels = Object.keys(mpMap);
+      const mpGPMPs = mpLabels.map(m => mpMap[m].ambil > 0 ? +(mpMap[m].mata / mpMap[m].ambil).toFixed(2) : 0);
+
+      const gpmpLabelPlugin = {
+        id: "gpmpLabelPlugin",
+        afterDatasetsDraw(chart) {
+          const { ctx } = chart;
+          ctx.save();
+          ctx.textAlign = "left";
+          ctx.textBaseline = "middle";
+          ctx.fillStyle = "#0f172a";
+          ctx.font = "bold 10px 'Segoe UI', sans-serif";
+
+          const meta = chart.getDatasetMeta(0);
+          meta.data.forEach((bar, index) => {
+            const val = Number(chart.data.datasets[0].data[index]).toFixed(2);
+            ctx.fillText(val, bar.x + 6, bar.y);
+          });
+          ctx.restore();
+        }
+      };
+
+      const ctxGPMP = document.getElementById("chartGPMP").getContext("2d");
+      chartGPMPInstance = new Chart(ctxGPMP, {
+        type: "bar",
+        data: {
+          labels: mpLabels.map(l => l.length > 22 ? l.substring(0, 20) + "..." : l),
+          datasets: [{
+            label: "GPMP",
+            data: mpGPMPs,
+            backgroundColor: mpGPMPs.map(v => v > 3.5 ? "#dc2626" : "#1e3a8a"),
+            borderRadius: 6
+          }]
+        },
+        options: {
+          indexAxis: "y",
+          responsive: true,
+          maintainAspectRatio: false,
+          layout: { padding: { right: 38 } },
+          scales: { x: { min: 0, max: 6 } },
+          plugins: { legend: { display: false } }
+        },
+        plugins: [gpmpLabelPlugin]
+      });
+    }
+
+    function renderTable(filtered) {
+      const tbody = document.getElementById("tableBody");
+      document.getElementById("tableCountBadge").textContent = `${filtered.length} Rekod`;
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="12" class="px-4 py-8 text-center text-slate-500">Tiada data bagi pilihan ini. Pentadbir boleh memuat naik fail melalui <strong>Mod Admin</strong>.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = filtered.map(d => {
+        const ambil = d.a + d.b + d.c + d.d + d.e + d.f;
+        const lulus = d.a + d.b + d.c + d.d + d.e;
+        const pct = ambil > 0 ? ((lulus / ambil) * 100).toFixed(2) : "0.00";
+        const mata = (d.a * 1) + (d.b * 2) + (d.c * 3) + (d.d * 4) + (d.e * 5) + (d.f * 6);
+        const gpmp = ambil > 0 ? (mata / ambil).toFixed(2) : "0.00";
+
+        return `
+          <tr class="hover:bg-amber-50/50">
+            <td class="px-3 sm:px-4 py-2.5 font-bold text-blue-950">${d.mp}</td>
+            <td class="px-3 sm:px-4 py-2.5 text-slate-600">${d.tahun}</td>
+            <td class="px-2.5 py-2.5 text-center font-semibold">${d.a}</td>
+            <td class="px-2.5 py-2.5 text-center">${d.b}</td>
+            <td class="px-2.5 py-2.5 text-center">${d.c}</td>
+            <td class="px-2.5 py-2.5 text-center">${d.d}</td>
+            <td class="px-2.5 py-2.5 text-center">${d.e}</td>
+            <td class="px-2.5 py-2.5 text-center font-bold text-red-600">${d.f}</td>
+            <td class="px-2.5 py-2.5 text-center text-slate-500">${d.td}</td>
+            <td class="px-2.5 py-2.5 text-center font-semibold">${ambil}</td>
+            <td class="px-2.5 py-2.5 text-center font-bold text-emerald-700">${pct}%</td>
+            <td class="px-2.5 py-2.5 text-center font-extrabold text-blue-950">${gpmp}</td>
+          </tr>
+        `;
+      }).join("");
+    }
+
+    function openIntervensiModal() {
+      document.getElementById("intervensiModal").classList.remove("hidden");
+      document.getElementById("intervensiModal").classList.add("flex");
+      renderIntervensiTable();
+    }
+
+    function closeIntervensiModal() {
+      document.getElementById("intervensiModal").classList.add("hidden");
+      document.getElementById("intervensiModal").classList.remove("flex");
+    }
+
+    function renderIntervensiTable() {
+      const list = examStore[currentExam].intervensi;
+      const q = document.getElementById("searchIntervensi").value.toLowerCase();
+      const filtered = list.filter(m =>
+        m.nama.toLowerCase().includes(q) ||
+        m.kelas.toLowerCase().includes(q) ||
+        m.subjek.toLowerCase().includes(q)
+      );
+
+      document.getElementById("intervensiCount").textContent = `${filtered.length} Murid`;
+      const tbody = document.getElementById("intervensiTableBody");
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" class="px-4 py-8 text-center text-slate-500">Tiada rekod senarai murid intervensi ${currentExam} dimuat naik setakat ini.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = filtered.map((m, i) => `
+        <tr class="hover:bg-amber-50/60">
+          <td class="px-3 py-2 text-slate-500">${i + 1}</td>
+          <td class="px-3 py-2 font-bold text-slate-900">${m.nama}</td>
+          <td class="px-3 py-2 text-slate-700">${m.kelas}</td>
+          <td class="px-3 py-2 font-semibold text-blue-950">${m.subjek}</td>
+          <td class="px-3 py-2 text-center">${m.markah}</td>
+          <td class="px-3 py-2 text-center"><span class="bg-red-100 text-red-700 font-bold px-2.5 py-0.5 rounded">${m.gred}</span></td>
+        </tr>
+      `).join("");
+    }
+
+    populateFilters();
+    renderDashboard();
+  </script>
+</body>
+</html>
